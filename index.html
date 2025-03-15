@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تحويل صورة إلى GLB ورفعها للخادم</title>
+  <!-- تضمين مكتبة Three.js وGLTFExporter -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three/examples/js/exporters/GLTFExporter.js"></script>
+  <style>
+    body { text-align: center; font-family: Arial, sans-serif; }
+    #preview { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>اختر صورة لتحويلها إلى نموذج GLB ورفعه للخادم</h2>
+  <input type="file" id="imageInput" accept="image/*">
+  <br><br>
+  <button onclick="convertAndUpload()">تحويل ورفع النموذج</button>
+  <a href="ar_viewer.php?model=model.glb" class="btn">🔍 تجربة في الواقع المعزز</a>
+  <div id="preview"></div>
+
+  <script>
+    let scene, camera, renderer, material, mesh;
+
+    // إعداد مشهد Three.js بسيط
+    function initScene() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+      camera.position.z = 2;
+
+      renderer = new THREE.WebGLRenderer({ alpha: true });
+      renderer.setSize(500, 500);
+      document.getElementById("preview").appendChild(renderer.domElement);
+
+      const geometry = new THREE.PlaneGeometry(1, 1);
+      material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+      mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+    }
+
+    // تحميل الصورة وتحويلها إلى Texture
+    function loadImageToTexture(file) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load(event.target.result, function(texture) {
+          material.map = texture;
+          material.needsUpdate = true;
+          renderer.render(scene, camera);
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // تحويل المشهد إلى نموذج GLB ورفعه للخادم
+    function convertAndUpload() {
+      const fileInput = document.getElementById("imageInput");
+      if (!fileInput.files.length) {
+        alert("الرجاء اختيار صورة أولاً.");
+        return;
+      }
+      // تهيئة المشهد إذا لم يكن موجوداً
+      if (!scene) {
+        initScene();
+      }
+      loadImageToTexture(fileInput.files[0]);
+
+      // استخدام GLTFExporter لتحويل المشهد إلى GLB
+      const exporter = new THREE.GLTFExporter();
+      exporter.parse(scene, function(result) {
+        // النتيجة هنا ArrayBuffer لأننا نستخدم الخيار الثنائي (binary)
+        const blob = new Blob([result], { type: "model/gltf-binary" });
+        uploadGLB(blob);
+      }, { binary: true });
+    }
+
+    // رفع ملف GLB إلى الخادم باستخدام Fetch وFormData
+    function uploadGLB(blob) {
+      const formData = new FormData();
+      // سنرسل الملف مع الاسم "model.glb"
+      formData.append("modelFile", blob, "model.glb");
+
+      // نفترض أن سكريبت PHP موجود في نفس مجلد المشروع باسم upload.php
+      fetch("upload.php", {
+        method: "POST",
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        alert("تم رفع النموذج بنجاح! " + data.message);
+      })
+      .catch(error => {
+        console.error("خطأ في الرفع:", error);
+        alert("حدث خطأ أثناء رفع النموذج.");
+      });
+    }
+  </script>
+</body>
+</html>
