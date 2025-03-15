@@ -72,23 +72,27 @@
     }
 
     function uploadGLB(blob) {
-      const formData = new FormData();
-      formData.append("modelFile", blob, fileName); // إرسال الملف باسمه الفعلي
+  const formData = new FormData();
+  formData.append("modelFile", blob, fileName);
 
-      fetch("upload.php", {
-        method: "POST",
-        body: formData
-      })
-      .then(response => response.json())
-      .then(data => {
-        alert("تم رفع النموذج بنجاح! " + data.message);
-        displayModel(data.filePath); // عرض النموذج
-      })
-      .catch(error => {
-        console.error("خطأ في الرفع:", error);
-        alert("حدث خطأ أثناء رفع النموذج.");
-      });
+  fetch("upload.php", {
+    method: "POST",
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.status === "success") {
+      alert("تم رفع النموذج بنجاح!");
+      displayModel(data.filePath);
+    } else {
+      alert("خطأ في الرفع: " + data.message + " | " + (data.error || "لا يوجد تفاصيل"));
     }
+  })
+  .catch(error => {
+    console.error("خطأ في الاتصال بالخادم:", error);
+    alert("حدث خطأ أثناء رفع النموذج: " + error);
+  });
+}
 
     function displayModel(filePath) {
       document.getElementById("modelDisplay").innerHTML = "";
