@@ -6,10 +6,9 @@
   <title>تحويل صورة إلى GLB ورفعها للخادم</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three/examples/js/exporters/GLTFExporter.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
   <style>
     body { text-align: center; font-family: Arial, sans-serif; }
-    #preview, #modelDisplay { margin-top: 20px; }
+    #preview { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -18,11 +17,12 @@
   <br><br>
   <button onclick="convertAndUpload()">تحويل ورفع النموذج</button>
   <div id="preview"></div>
-  <h3>عرض النموذج بعد الرفع:</h3>
-  <div id="modelDisplay"></div>
+  <h3>🔍 النموذج المرفوع:</h3>
+  <iframe id="modelViewer" width="600" height="400"></iframe>
 
   <script>
-    let scene, camera, renderer, material, mesh, fileName;
+    let scene, camera, renderer, material, mesh;
+    const serverURL = "https://example.com/upload.php"; // ✨ استبدله بعنوان خادمك
 
     function initScene() {
       scene = new THREE.Scene();
@@ -40,7 +40,6 @@
     }
 
     function loadImageToTexture(file) {
-      fileName = file.name.split('.').slice(0, -1).join('.') + ".glb"; // استخراج اسم الملف بدون الامتداد
       const reader = new FileReader();
       reader.onload = function(event) {
         const textureLoader = new THREE.TextureLoader();
@@ -59,6 +58,8 @@
         alert("الرجاء اختيار صورة أولاً.");
         return;
       }
+      const fileName = fileInput.files[0].name.split(".")[0] + ".glb";
+
       if (!scene) {
         initScene();
       }
@@ -67,53 +68,31 @@
       const exporter = new THREE.GLTFExporter();
       exporter.parse(scene, function(result) {
         const blob = new Blob([result], { type: "model/gltf-binary" });
-        uploadGLB(blob);
+        uploadGLB(blob, fileName);
       }, { binary: true });
     }
 
-    function uploadGLB(blob) {
-  const formData = new FormData();
-  formData.append("modelFile", blob, fileName);
+    function uploadGLB(blob, fileName) {
+      const formData = new FormData();
+      formData.append("modelFile", blob, fileName);
 
-  fetch("upload.php", {
-    method: "POST",
-    body: formData
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.status === "success") {
-      alert("تم رفع النموذج بنجاح!");
-      displayModel(data.filePath);
-    } else {
-      alert("خطأ في الرفع: " + data.message + " | " + (data.error || "لا يوجد تفاصيل"));
-    }
-  })
-  .catch(error => {
-    console.error("خطأ في الاتصال بالخادم:", error);
-    alert("حدث خطأ أثناء رفع النموذج: " + error);
-  });
-}
-
-    function displayModel(filePath) {
-      document.getElementById("modelDisplay").innerHTML = "";
-      const loader = new THREE.GLTFLoader();
-      const sceneModel = new THREE.Scene();
-      const cameraModel = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      cameraModel.position.z = 2;
-
-      const rendererModel = new THREE.WebGLRenderer({ alpha: true });
-      rendererModel.setSize(500, 500);
-      document.getElementById("modelDisplay").appendChild(rendererModel.domElement);
-
-      loader.load(filePath, function(gltf) {
-        sceneModel.add(gltf.scene);
-        animate();
+      fetch(serverURL, {
+        method: "POST",
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === "success") {
+          alert("تم رفع النموذج بنجاح! 🎉");
+          document.getElementById("modelViewer").src = "https://mimoaldobai.github.io/convertTo3D//models/" + fileName;
+        } else {
+          alert("خطأ في الرفع: " + data.message);
+        }
+      })
+      .catch(error => {
+        console.error("خطأ في الاتصال بالخادم:", error);
+        alert("حدث خطأ أثناء رفع النموذج.");
       });
-
-      function animate() {
-        requestAnimationFrame(animate);
-        rendererModel.render(sceneModel, cameraModel);
-      }
     }
   </script>
 </body>
