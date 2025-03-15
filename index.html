@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>تحويل صورة إلى GLB ورفعها للخادم</title>
-  <!-- تضمين مكتبة Three.js وGLTFExporter -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three/examples/js/exporters/GLTFExporter.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
   <style>
     body { text-align: center; font-family: Arial, sans-serif; }
-    #preview { margin-top: 20px; }
+    #preview, #modelDisplay { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -17,13 +17,13 @@
   <input type="file" id="imageInput" accept="image/*">
   <br><br>
   <button onclick="convertAndUpload()">تحويل ورفع النموذج</button>
-  <a href="ar_viewer.php?model=model.glb" class="btn">🔍 تجربة في الواقع المعزز</a>
   <div id="preview"></div>
+  <h3>عرض النموذج بعد الرفع:</h3>
+  <div id="modelDisplay"></div>
 
   <script>
-    let scene, camera, renderer, material, mesh;
+    let scene, camera, renderer, material, mesh, fileName;
 
-    // إعداد مشهد Three.js بسيط
     function initScene() {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
@@ -39,8 +39,8 @@
       scene.add(mesh);
     }
 
-    // تحميل الصورة وتحويلها إلى Texture
     function loadImageToTexture(file) {
+      fileName = file.name.split('.').slice(0, -1).join('.') + ".glb"; // استخراج اسم الملف بدون الامتداد
       const reader = new FileReader();
       reader.onload = function(event) {
         const textureLoader = new THREE.TextureLoader();
@@ -53,35 +53,28 @@
       reader.readAsDataURL(file);
     }
 
-    // تحويل المشهد إلى نموذج GLB ورفعه للخادم
     function convertAndUpload() {
       const fileInput = document.getElementById("imageInput");
       if (!fileInput.files.length) {
         alert("الرجاء اختيار صورة أولاً.");
         return;
       }
-      // تهيئة المشهد إذا لم يكن موجوداً
       if (!scene) {
         initScene();
       }
       loadImageToTexture(fileInput.files[0]);
 
-      // استخدام GLTFExporter لتحويل المشهد إلى GLB
       const exporter = new THREE.GLTFExporter();
       exporter.parse(scene, function(result) {
-        // النتيجة هنا ArrayBuffer لأننا نستخدم الخيار الثنائي (binary)
         const blob = new Blob([result], { type: "model/gltf-binary" });
         uploadGLB(blob);
       }, { binary: true });
     }
 
-    // رفع ملف GLB إلى الخادم باستخدام Fetch وFormData
     function uploadGLB(blob) {
       const formData = new FormData();
-      // سنرسل الملف مع الاسم "model.glb"
-      formData.append("modelFile", blob, "model.glb");
+      formData.append("modelFile", blob, fileName); // إرسال الملف باسمه الفعلي
 
-      // نفترض أن سكريبت PHP موجود في نفس مجلد المشروع باسم upload.php
       fetch("upload.php", {
         method: "POST",
         body: formData
@@ -89,11 +82,34 @@
       .then(response => response.json())
       .then(data => {
         alert("تم رفع النموذج بنجاح! " + data.message);
+        displayModel(data.filePath); // عرض النموذج
       })
       .catch(error => {
         console.error("خطأ في الرفع:", error);
         alert("حدث خطأ أثناء رفع النموذج.");
       });
+    }
+
+    function displayModel(filePath) {
+      document.getElementById("modelDisplay").innerHTML = "";
+      const loader = new THREE.GLTFLoader();
+      const sceneModel = new THREE.Scene();
+      const cameraModel = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      cameraModel.position.z = 2;
+
+      const rendererModel = new THREE.WebGLRenderer({ alpha: true });
+      rendererModel.setSize(500, 500);
+      document.getElementById("modelDisplay").appendChild(rendererModel.domElement);
+
+      loader.load(filePath, function(gltf) {
+        sceneModel.add(gltf.scene);
+        animate();
+      });
+
+      function animate() {
+        requestAnimationFrame(animate);
+        rendererModel.render(sceneModel, cameraModel);
+      }
     }
   </script>
 </body>
